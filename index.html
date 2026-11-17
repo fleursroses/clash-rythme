@@ -396,7 +396,7 @@ $('vol').oninput = e => { if (master) master.gain.value = e.target.value / 100; 
 const buffers = {}, loading = {};
 function loadBeat(id){
   if (buffers[id]) return Promise.resolve(buffers[id]);
-  if (!loading[id]){ ensureCtx(); loading[id] = fetch('prods/' + id + '.mp3').then(r => r.arrayBuffer()).then(a => ctx.decodeAudioData(a)).then(b => (buffers[id] = b)); }
+  if (!loading[id]){ ensureCtx(); const bt = BEATS.find(x => x.id === id); loading[id] = fetch(bt && bt.url ? bt.url : 'prods/' + id + '.mp3').then(r => r.arrayBuffer()).then(a => ctx.decodeAudioData(a)).then(b => (buffers[id] = b)).catch(e => { delete loading[id]; status('prod indisponible, choisis-en une autre'); throw e; }); }
   return loading[id];
 }
 function tick(t, strong){
@@ -461,7 +461,7 @@ const duoActive = () => !!(paired && conn);
 async function startGame(m){
   ensureCtx(); stopGame(false);
   const token = ++myToken;
-  const buf = await loadBeat(m.id);
+  let buf; try { buf = await loadBeat(m.id); } catch(e){ $('beatPlay').textContent = '▶'; return; }
   if (token !== myToken) return;      // une autre partie a été lancée entre-temps
   const bus = ctx.createGain(); bus.connect(master);
   const barDur = 240 / m.bpm;
@@ -598,8 +598,9 @@ $('btnPlay').onclick = async () => {
   if (duo && !isHost) return;
   const b = curBeat(), t = tuneOf(b);
   $('btnPlay').disabled = true; $('btnPlay').textContent = 'Chargement…';
-  const buf = await loadBeat(b.id);
-  $('btnPlay').disabled = false; $('btnPlay').textContent = duo ? '▶ Jouer à deux' : '▶ Jouer';
+  let buf; try { buf = await loadBeat(b.id); } catch(e){ buf = null; }
+  $('btnPlay').disabled = false;
+  if (!buf){ $('btnPlay').textContent = duo ? '▶ Jouer à deux' : '▶ Jouer'; return; } $('btnPlay').textContent = duo ? '▶ Jouer à deux' : '▶ Jouer';
   const nLines = Math.max(0, Math.floor((buf.duration - t.offset) / (240 / t.bpm)) - FIRST_BAR);
   const m = {t:'start', duo, id: b.id, bpm: t.bpm, offset: t.offset, per: duo ? (PERS[per] === 'auto' ? (t.bpm < 80 ? 1 : 2) : PERS[per]) : 1e6,
              first: duo ? ($('first').value === 'r' ? (Math.random() < .5 ? 0 : 1) : +$('first').value) : ME,
