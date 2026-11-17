@@ -69,6 +69,7 @@
   #vGame .who{font-size:14px}
   #role{text-align:center;font-size:clamp(24px,5vw,40px);font-weight:800;min-height:52px;margin-bottom:14px}
   #role.me{color:var(--ok)} #role.other{color:var(--dim)} #role.warn{color:var(--y)}
+  #ball{position:absolute;left:0;top:0;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#ffd23d 60%,#e0a800);box-shadow:0 4px 14px #ffd23d88;pointer-events:none;display:none;z-index:5}
   #info{display:flex;justify-content:space-between;color:var(--dim);margin-top:16px}
   .prog{height:6px;background:#262934;border-radius:3px;overflow:hidden;margin-top:8px}
   .prog div{height:100%;width:0;background:var(--acc)}
@@ -163,10 +164,10 @@
 <section id="vGame" class="hidden">
   <div class="inner">
     <div id="role"></div>
-    <div class="grid" id="gameGrid"></div>
+    <div style="position:relative"><div class="grid" id="gameGrid"></div><div id="ball"></div></div>
     <div class="prog"><div id="progIn"></div></div>
     <div id="info"><span id="turnTxt"></span><span id="barTxt"></span></div>
-    <div style="text-align:center;margin-top:24px"><button class="btn sec" id="btnStop">■ Arrêter</button></div>
+    <div style="text-align:center;margin-top:24px"><button class="btn" id="btnPause">⏸ Pause</button> <button class="btn sec" id="btnStop">■ Arrêter</button></div>
   </div>
 </section>
 
@@ -243,6 +244,84 @@ const PACKS = [
  "mélancolie folie poésie jalousie hypocrisie amnésie",
  "cyclone téléphone couronne amazone hormone"])}
 ];
+PACKS.push(
+ {name:'❤️ Amour', words: fam([
+ "amour toujours jour retour velours détour secours humour",
+ "baiser embrasser pensée fiancée passé blessé",
+ "cœur douceur bonheur pleurs fleur chaleur",
+ "regard hasard retard départ cafard part",
+ "âme flamme drame femme dame",
+ "tendresse caresse promesse jeunesse ivresse faiblesse",
+ "passion frisson chanson raison émotion cupidon",
+ "rupture blessure aventure murmure torture",
+ "jalouse épouse douze blouse pelouse",
+ "bisou fou doux jaloux genoux rendez-vous"])},
+ {name:'⚽ Sport', words: fam([
+ "ballon champion poumon talon crampon menton",
+ "stade grade parade arcade tornade balade",
+ "terrain refrain matin destin requin malin",
+ "chute lutte dispute minute parachute flûte",
+ "arbitre titre pupitre chapitre vitre",
+ "victoire gloire histoire mémoire espoir",
+ "coach approche poche proche cloche",
+ "penalty défi pari fini cri Paris",
+ "tacle spectacle miracle obstacle débâcle",
+ "cible terrible horrible possible invisible impossible",
+ "finale rivale normale banale scandale signal"])},
+ {name:'💸 Argent', words: fam([
+ "billet palais gilet chalet mollet jamais",
+ "oseille bouteille merveille pareille veille oreille",
+ "liasse classe crasse place masse impasse",
+ "banque manque planque flanque",
+ "riche triche niche affiche biche",
+ "millionnaire salaire galère affaire colère partenaire",
+ "fortune lune rancune lacune commune tribune",
+ "lingot magot cageot escargot",
+ "dépense chance avance vengeance balance défense",
+ "diamant aimant maintenant violent restaurant"])},
+ {name:'🎮 Jeux vidéo', words: fam([
+ "manette planète tablette raquette cachette",
+ "niveau château cadeau chapeau bateau",
+ "pixel réel ciel éternel arc-en-ciel",
+ "écran temps tyran géant volcan",
+ "partie vie survie magie folie envie",
+ "quête tête fête bête conquête",
+ "zombie pluie nuit ennui minuit",
+ "recharge marge large charge barge",
+ "épée armée fumée fée allée",
+ "dragon donjon champion poison canon"])},
+ {name:'🌍 Nature', words: fam([
+ "lion million crayon rayon pion camion",
+ "loup hibou caillou bambou genou kangourou",
+ "forêt secret regret effet sommet poignet",
+ "rivière lumière poussière clairière pierre",
+ "montagne campagne Bretagne castagne gagne bagne",
+ "serpent dent vent sang géant",
+ "orage sauvage nuage plage cage",
+ "neige piège manège siège cortège",
+ "requin marin chemin jardin sapin",
+ "abeille oreille soleil merveille corneille"])},
+ {name:'🎉 Fête', words: fam([
+ "soirée entrée fumée armée journée",
+ "danse transe ambiance chance cadence",
+ "verre terre guerre hier frère",
+ "gâteau cadeau rideau bravo ghetto",
+ "lumière dernière bière première carrière",
+ "minuit bruit nuit pluie ennui",
+ "piste triste artiste liste existe",
+ "karaoké café clé été",
+ "confettis amis Paris souris fini"])},
+ {name:'🏫 École & famille', words: fam([
+ "cartable table fable diable stable capable",
+ "cahier escalier papier métier quartier",
+ "maman enfant parent grand temps",
+ "cousin voisin copain matin demain",
+ "devoir soir noir miroir trottoir",
+ "tonton bonbon maison raison salon",
+ "école colle parole drôle folle",
+ "mamie ami Paris pluie ennui",
+ "récré pressé passé fatigué"])}
+);
 PACKS.push({name:'🎲 Tout mélangé', words: PACKS.flatMap(p => p.words)});
 
 const SCHEMES = ['AABB','ABAB','ABBA','AAAA'];
@@ -328,7 +407,7 @@ function tick(t, strong){
 /* ================= PRODS ================= */
 let BEATS = [], filter = 'Tout', cur = 0, ticks = false;
 const ICON = {'Boom bap':'📼', 'Old school':'📻', 'Chill':'🌙', 'Drill':'🔪', 'Trap':'💎'};
-const tuneKey = id => 'clashTune-' + id;
+const tuneKey = id => 'clashTune2-' + id;
 function tuneOf(b){ try { return JSON.parse(localStorage[tuneKey(b.id)] || 'null') || {bpm: b.bpm, offset: b.offset}; } catch(e){ return {bpm: b.bpm, offset: b.offset}; } }
 function setTune(b, t){ try { localStorage[tuneKey(b.id)] = JSON.stringify(t); } catch(e){} }
 const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
@@ -382,25 +461,47 @@ async function startGame(m){
   const token = ++myToken;
   const buf = await loadBeat(m.id);
   if (token !== myToken) return;      // une autre partie a été lancée entre-temps
-  const outLat = ctx.outputLatency || ctx.baseLatency || 0;
-  const songOut = ctx.currentTime + (m.startAt - hostNow()) / 1000;   // moment où le début de la prod sort des enceintes
   const bus = ctx.createGain(); bus.connect(master);
-  const src = ctx.createBufferSource(); src.buffer = buf; src.connect(bus);
-  const when = songOut - outLat;
-  if (when >= ctx.currentTime) src.start(when); else src.start(ctx.currentTime, ctx.currentTime - when);
   const barDur = 240 / m.bpm;
   const nBars = Math.floor((buf.duration - m.offset) / barDur);
-  game = {...m, src, bus, songOut, barDur, beatDur: barDur / 4, dur: buf.duration, nLines: Math.max(0, nBars - FIRST_BAR), nextTick: 0};
-  src.onended = () => { if (game && game.src === src){ const pv = game.preview; stopGame(false); if (!pv) $('endMsg').classList.remove('hidden'); } };
-  tickTimer = setInterval(scheduleTicks, 25); scheduleTicks();
+  game = {...m, buf, bus, barDur, beatDur: barDur / 4, dur: buf.duration, nLines: Math.max(0, nBars - FIRST_BAR), paused: false};
+  playFrom(0, m.startAt);
+  tickTimer = setInterval(scheduleTicks, 25);
   if (!m.preview){
-    $('endMsg').classList.add('hidden');
+    $('endMsg').classList.add('hidden'); $('btnPause').textContent = '⏸ Pause';
     $('vGame').classList.remove('hidden'); $('playbar').classList.add('hidden');
   } else $('beatPlay').textContent = '⏸';
   raf = requestAnimationFrame(draw);
 }
+// lance la prod pour que la position "pos" (en s) sorte des enceintes à l'heure commune "startAt"
+function playFrom(pos, startAt){
+  const g = game, outLat = ctx.outputLatency || ctx.baseLatency || 0;
+  g.songOut = ctx.currentTime + (startAt - hostNow()) / 1000 - pos;
+  const src = ctx.createBufferSource(); src.buffer = g.buf; src.connect(g.bus);
+  const when = g.songOut + pos - outLat;
+  if (when >= ctx.currentTime) src.start(when, pos); else src.start(ctx.currentTime, pos + ctx.currentTime - when);
+  g.src = src; g.paused = false;
+  g.nextTick = Math.max(0, Math.ceil((pos - g.offset) / g.beatDur));
+  src.onended = () => { if (game && game.src === src && !game.paused){ const pv = game.preview; stopGame(false); if (!pv) $('endMsg').classList.remove('hidden'); } };
+}
+function pauseGame(send, pos){
+  const g = game; if (!g || g.paused || g.preview) return;
+  g.paused = true;
+  g.pausePos = pos != null ? pos : Math.max(0, ctx.currentTime - g.songOut);
+  try { g.src.stop(); } catch(e){}
+  if (send && duoActive()) conn.send({t:'pause', pos: g.pausePos});
+  $('btnPause').textContent = '▶ Reprendre';
+}
+function resumeGame(send, m){
+  const g = game; if (!g || !g.paused) return;
+  const pos = m ? m.pos : Math.max(0, g.pausePos - g.barDur);    // on reprend 1 mesure avant pour se recaler
+  const startAt = m ? m.startAt : hostNow() + (duoActive() ? 1500 : 300);
+  if (send && duoActive()) conn.send({t:'resume', pos, startAt});
+  playFrom(pos, startAt);
+  $('btnPause').textContent = '⏸ Pause';
+}
 function scheduleTicks(){
-  const g = game; if (!g || !ticks) return;
+  const g = game; if (!g || !ticks || g.paused) return;
   const outLat = ctx.outputLatency || ctx.baseLatency || 0;
   while (true){
     const t = g.songOut + g.offset + g.nextTick * g.beatDur;
@@ -413,9 +514,26 @@ function stopGame(send){
   myToken++;
   if (send && duoActive()) conn.send({t:'stop'});
   clearInterval(tickTimer); cancelAnimationFrame(raf);
-  if (game){ const {src, bus} = game; game = null; bus.gain.setTargetAtTime(0, ctx.currentTime, 0.04); setTimeout(() => { try { src.stop(); } catch(e){} bus.disconnect(); }, 300); }
+  if (game){ const {src, bus} = game; game = null; bus.gain.setTargetAtTime(0, ctx.currentTime, 0.04); setTimeout(() => { try { src && src.stop(); } catch(e){} bus.disconnect(); }, 300); }
   $('vGame').classList.add('hidden'); $('playbar').classList.remove('hidden');
   $('beatPlay').textContent = '▶'; $('seekIn').style.width = '0';
+}
+// la boule rebondit d'un carré à l'autre, en touchant chaque carré pile sur le temps
+function placeBall(rowIdx, beatF, countIn){
+  const ball = $('ball'), grid = $('gameGrid'), rows = grid.children;
+  if (rowIdx < 0 || !rows[rowIdx]){ ball.style.display = 'none'; return; }
+  const k = Math.floor(beatF), f = beatF - k;
+  const sq = (r, c) => rows[r] && rows[r].children[c];
+  const from = sq(rowIdx, countIn ? 0 : k);
+  let to = countIn ? from : (k < 3 ? sq(rowIdx, k + 1) : (sq(rowIdx + 1, 0) || sq(0, 0)));
+  if (!from) { ball.style.display = 'none'; return; }
+  const base = ball.parentElement.getBoundingClientRect(), a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+  const x = (a.left + a.width / 2) * (1 - f) + (b.left + b.width / 2) * f - base.left;
+  const y0 = (a.top) * (1 - f) + (b.top) * f - base.top;
+  const h = Math.min(70, a.height * 0.9);
+  const y = y0 - 4 * h * f * (1 - f);
+  ball.style.display = 'block';
+  ball.style.transform = `translate(${x - 13}px, ${y - 24}px)`;
 }
 function lineInfo(L){
   const g = game, r = (g.first + Math.floor(L / g.per)) % 2;
@@ -424,7 +542,7 @@ function lineInfo(L){
 function draw(){
   const g = game; if (!g) return;
   raf = requestAnimationFrame(draw);
-  const t = ctx.currentTime - g.songOut;          // temps écoulé dans la prod
+  const t = g.paused ? g.pausePos : ctx.currentTime - g.songOut;          // temps écoulé dans la prod
   $('seekIn').style.width = Math.max(0, Math.min(100, t / g.dur * 100)) + '%';
   if (g.preview) return;
   const tm = t - g.offset, role = $('role'), other = names[1 - ME] || 'Ton pote', grid = $('gameGrid');
@@ -433,6 +551,9 @@ function draw(){
   const lineObj = k => { if (k < 0 || k >= g.nLines) return null; const w = g.words[k], i = lineInfo(k); return {...w, mine: g.duo && i.mine, who: g.duo ? (i.mine ? 'TOI' : other.slice(0, 6).toUpperCase()) : ''}; };
   const block = Math.max(0, Math.floor(L / 4) * 4);
   fillGrid(grid, [0,1,2,3].map(r => lineObj(block + r)), L >= 0 ? L - block : -1, beat);
+  const beatF = (tm - bar * g.barDur) / g.beatDur;
+  if (tm < 0 || L >= g.nLines) placeBall(-1); else if (L < 0) placeBall(0, beatF, true); else placeBall(L - block, beatF, false);
+  if (g.paused){ role.className = 'warn'; role.textContent = '⏸ Pause'; return; }
   $('progIn').style.width = Math.max(0, Math.min(100, t / g.dur * 100)) + '%';
   if (L >= g.nLines){ role.className = 'warn'; role.textContent = 'Fin ! 🔥'; $('barTxt').textContent = ''; return; }
   $('barTxt').textContent = L >= 0 ? 'Mesure ' + (L + 1) + ' / ' + g.nLines : '';
@@ -468,7 +589,12 @@ $('btnPlay').onclick = async () => {
   startGame(m);
 };
 $('btnStop').onclick = () => stopGame(true);
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && game && !game.preview) stopGame(true); });
+$('btnPause').onclick = () => { if (!game) return; if (game.paused) resumeGame(true); else pauseGame(true); };
+document.addEventListener('keydown', e => {
+  if (!game || game.preview) return;
+  if (e.key === 'Escape') stopGame(true);
+  if (e.code === 'Space'){ e.preventDefault(); $('btnPause').click(); }
+});
 
 /* ================= À DEUX (relais MQTT) ================= */
 $('duoBtn').onclick = () => { $('duoPanel').classList.toggle('hidden'); $('duoBtn').classList.toggle('on', !$('duoPanel').classList.contains('hidden')); $('duoPanel').scrollIntoView({behavior:'smooth'}); };
@@ -542,6 +668,8 @@ function onData(m){
   else if (m.t === 'select'){ const i = BEATS.findIndex(b => b.id === m.id); if (i >= 0){ cur = i; filter = 'Tout'; refreshBeat(); loadBeat(m.id); } }
   else if (m.t === 'start'){ const i = BEATS.findIndex(b => b.id === m.id); if (i >= 0){ cur = i; refreshBeat(); } startGame(m); }
   else if (m.t === 'stop') stopGame(false);
+  else if (m.t === 'pause') pauseGame(false, m.pos);
+  else if (m.t === 'resume') resumeGame(false, m);
   else if (m.t === 'bye') disconnect('ton pote a quitté');
 }
 window.addEventListener('pagehide', () => { if (paired && conn) conn.send({t:'bye'}); });
@@ -566,7 +694,7 @@ $('btnJoin').onclick = () => {
 
 /* ================= DÉMARRAGE ================= */
 refreshSetup();
-fetch('prods.json').then(r => r.json()).then(list => {
+fetch('prods.json?v=' + Date.now()).then(r => r.json()).then(list => {
   BEATS = list; cur = Math.floor(Math.random() * BEATS.length);
   $('beatCount').textContent = '(' + BEATS.length + ' prods)';
   $('credits').textContent = [...new Set(BEATS.map(b => b.artist))].join(', ');
