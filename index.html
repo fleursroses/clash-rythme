@@ -328,8 +328,8 @@ PACKS.push({name:'🎲 Tout mélangé', words: PACKS.flatMap(p => p.words)});
 
 const SCHEMES = ['AABB','ABAB','ABBA','AAAA'];
 const FILLS = [{n:'Tous les mots', f:[1,1,1,1]}, {n:'Un sur deux', f:[0,1,0,1]}, {n:'Fin de bloc', f:[0,0,0,1]}];
-const PERS = [1, 2, 4, 8];
-let sch = 0, pack = 0, fill = 0, per = 1;
+const PERS = ['auto', 1, 2, 4, 8];
+let sch = 0, pack = 0, fill = 0, per = 0;
 
 function shuffle(a){ return a.slice().sort(() => Math.random() - 0.5); }
 function makeWords(nLines, scheme, fillIdx, packIdx){
@@ -366,7 +366,7 @@ function refreshSetup(){
   $('packName').textContent = PACKS[pack].name;
   $('packInfo').textContent = (pack + 1) + ' sur ' + PACKS.length + ' · ' + PACKS[pack].words.length + ' familles de rimes · clique pour voir tout';
   $('fillName').textContent = FILLS[fill].n;
-  $('perName').textContent = PERS[per] + (PERS[per] > 1 ? ' mesures' : ' mesure') + ' chacun';
+  $('perName').textContent = PERS[per] === 'auto' ? 'Auto (1 mesure si lent, sinon 2)' : PERS[per] + (PERS[per] > 1 ? ' mesures' : ' mesure') + ' chacun';
   fillGrid($('previewGrid'), makeWords(4, sch, fill, pack), -1, -1);
 }
 buildGrid($('previewGrid'));
@@ -409,7 +409,7 @@ function tick(t, strong){
 /* ================= PRODS ================= */
 let BEATS = [], filter = 'Tout', cur = 0, ticks = false;
 const ICON = {'Boom bap':'📼', 'Old school':'📻', 'Chill':'🌙', 'Drill':'🔪', 'Trap':'💎'};
-const tuneKey = id => 'clashTune2-' + id;
+const tuneKey = id => 'clashTune3-' + id;
 function tuneOf(b){ try { return JSON.parse(localStorage[tuneKey(b.id)] || 'null') || {bpm: b.bpm, offset: b.offset}; } catch(e){ return {bpm: b.bpm, offset: b.offset}; } }
 function setTune(b, t){ try { localStorage[tuneKey(b.id)] = JSON.stringify(t); } catch(e){} }
 const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
@@ -601,7 +601,7 @@ $('btnPlay').onclick = async () => {
   const buf = await loadBeat(b.id);
   $('btnPlay').disabled = false; $('btnPlay').textContent = duo ? '▶ Jouer à deux' : '▶ Jouer';
   const nLines = Math.max(0, Math.floor((buf.duration - t.offset) / (240 / t.bpm)) - FIRST_BAR);
-  const m = {t:'start', duo, id: b.id, bpm: t.bpm, offset: t.offset, per: duo ? PERS[per] : 1e6,
+  const m = {t:'start', duo, id: b.id, bpm: t.bpm, offset: t.offset, per: duo ? (PERS[per] === 'auto' ? (t.bpm < 80 ? 1 : 2) : PERS[per]) : 1e6,
              first: duo ? ($('first').value === 'r' ? (Math.random() < .5 ? 0 : 1) : +$('first').value) : ME,
              words: makeWords(nLines, sch, fill, pack), startAt: hostNow() + (duo ? 2500 : 400)};
   if (duo) conn.send(m);
