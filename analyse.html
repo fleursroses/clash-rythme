@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><title>Analyse des prods</title>
+<style>body{background:#0b0c10;color:#eceef3;font:14px monospace;padding:20px}</style></head>
+<body><h2>Analyse des prods</h2><pre id="out">…</pre>
+<script src="analyse.js?3"></script>
+<script>
+const LIST = [
+ ['boombap-bleksound','Boom Bap','BLESKSOUND','Boom bap'],
+ ['hiphop-boombap-solarflex','Hip-Hop Boom Bap','SolarFLEX','Boom bap'],
+ ['oldschool-boombap-solarflex','Old School Boom Bap','SolarFLEX','Boom bap'],
+ ['boombap-audiodollar','Boom Bap Hip-Hop','AudioDollar','Boom bap'],
+ ['beautiful-boombap','Beautiful Boom Bap','Music_Unlimited','Boom bap'],
+ ['soulful-boombap','Soulful Boom Bap','Music_Unlimited','Boom bap'],
+ ['spray','Spray','agerabeatz','Boom bap'],
+ ['hard-street','Hard Street','echoes_of_lumen','Boom bap'],
+ ['rap-beat-bleksound','Rap Beat','BLESKSOUND','Old school'],
+ ['90s-hiphop','90s Hip Hop','AtlasAudio','Old school'],
+ ['hiphop-beats-bleksound','Hip-Hop Beats','BLESKSOUND','Old school'],
+ ['lofi-hiphop','Lofi Hip-Hop','ZephiraMusic','Chill'],
+ ['rap-beat-beats-gr0za','Rap Beat Beats','GR0ZA','Chill'],
+ ['uk-drill','UK Drill','vaitsez','Drill'],
+ ['drill-london','Drill London','echoes_of_lumen','Drill'],
+ ['hard-drill','Hard Drill','vaitsez','Drill'],
+ ['freestyle-drill','Freestyle Drill','vaitsez','Drill'],
+ ['newyork-drill','New York Drill','vaitsez','Drill'],
+ ['dark-trap','Dark Trap','echoes_of_lumen','Trap'],
+ ['aggressive-trap','Aggressive Trap','vaitsez','Trap'],
+ ['vintage-trap','Vintage Trap','vaitsez','Trap']];
+(async () => {
+  const ctx = new AudioContext(), res = [];
+  for (const [id, title, artist, style] of LIST){
+    const buf = await ctx.decodeAudioData(await (await fetch('prods/' + id + '.mp3')).arrayBuffer());
+    const a = await analyseBuffer(buf);
+    res.push({id, title, artist, style, ...a});
+    document.getElementById('out').textContent = res.map(r => JSON.stringify(r)).join('\n');
+  }
+  window.RESULT = res;
+})();
+</script></body></html>

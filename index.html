@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clash en rythme</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{--bg:#0b0c10;--card:#15171d;--line:#262934;--txt:#eceef3;--dim:#8d93a1;--acc:#ff3d6e;--A:#ff9a2e;--B:#38c6ff;--y:#ffd23d;--ok:#3dffb0}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.4 system-ui,Segoe UI,sans-serif;display:flex;justify-content:center;min-height:100vh}
+  main{width:100%;max-width:720px;padding:18px 18px 120px}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  h1{font-size:24px;margin:0;letter-spacing:1px} h1 span{color:var(--acc)}
+  .step{color:var(--dim);font-size:14px;margin:18px 0 8px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .hidden{display:none!important}
+  button{font:inherit;cursor:pointer;border:0;color:var(--txt)}
+  button:disabled{opacity:.4;cursor:default}
+  .arrow{background:none;font-size:28px;color:var(--dim);width:36px;height:44px;border-radius:8px}
+  .arrow:hover{color:var(--txt);background:#ffffff10}
+  .gridwrap{display:flex;align-items:center;gap:6px}
+  .grid{flex:1;display:flex;flex-direction:column;gap:8px}
+  .r4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;transition:opacity .15s;position:relative}
+  .sq{height:54px;border-radius:10px;background:#1f222b;border:1px solid #2c303c;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:clamp(14px,3.6vw,21px);text-align:center;padding:0 4px;transition:background .05s,transform .05s}
+  .sq.w{border:0;color:#111;box-shadow:inset 0 -4px 0 #0003}
+  .sq.w.A{background:var(--A)} .sq.w.B{background:var(--B)}
+  .sq.w.free{background:#1f222b;border:2px dashed #3a3f4d;color:var(--dim);box-shadow:none}
+  .sq.on{background:#fff;transform:scale(1.04)}
+  .sq.w.on{transform:scale(1.08);box-shadow:0 0 18px #fff8}
+  .r4.past{opacity:.3} .r4.none{visibility:hidden}
+  .who{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:800;color:var(--dim);pointer-events:none}
+  .r4.mine .who{color:var(--ok)}
+  .pill{flex:1;background:#1f222b;border:1px solid #2c303c;border-radius:12px;padding:10px 14px;text-align:center}
+  .pill b{font-size:19px} .pill small{display:block;color:var(--dim)}
+  .opts{display:flex;gap:10px;margin-top:12px}
+  .opt{flex:1;background:#0f1116;border:1px solid var(--line);border-radius:12px;padding:8px 12px;text-align:left}
+  .opt small{display:block;color:var(--dim);font-size:11px;letter-spacing:1px;text-transform:uppercase}
+  .opt b{font-size:15px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .chip{background:#1f222b;border-radius:20px;padding:5px 12px;font-size:14px;color:var(--dim)}
+  .chip.sel{background:var(--txt);color:#111;font-weight:700}
+  .beat{display:flex;gap:14px;align-items:center}
+  .cover{width:64px;height:64px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:28px;background:linear-gradient(135deg,#ff3d6e,#7b2dff);flex:none}
+  .beat .info{flex:1;min-width:0} .beat .info b{font-size:19px} .beat .info div{color:var(--dim);font-size:14px}
+  .seek{height:5px;background:#262934;border-radius:3px;margin-top:12px;overflow:hidden} .seek div{height:100%;width:0;background:var(--y)}
+  .ctrls{display:flex;justify-content:center;gap:10px;margin-top:12px}
+  .round{width:44px;height:44px;border-radius:50%;background:#262934;font-size:16px}
+  .round.big{width:54px;height:54px;background:var(--txt);color:#111;font-size:20px}
+  .tune{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;font-size:14px;color:var(--dim)}
+  .tune button{background:#262934;border-radius:8px;padding:5px 10px;font-size:14px}
+  .tune button.on{background:var(--ok);color:#111}
+  .playbar{position:fixed;left:0;right:0;bottom:0;background:#0b0c10ee;border-top:1px solid var(--line);display:flex;justify-content:center;padding:14px}
+  .playbar>div{width:100%;max-width:720px;display:flex;gap:10px;padding:0 18px}
+  .play{flex:1;background:var(--y);color:#111;font-weight:800;font-size:22px;border-radius:14px;padding:14px}
+  .duo{background:#262934;border-radius:14px;padding:0 16px;font-weight:700}
+  .duo.on{background:var(--ok);color:#111}
+  input,select{background:#0f1116;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px;font:inherit}
+  input[type=range]{width:100%;padding:0}
+  label{display:block;margin:10px 0 4px;color:var(--dim);font-size:14px}
+  .code{font:700 38px/1 ui-monospace,Consolas,monospace;letter-spacing:6px;color:var(--y)}
+  .btn{background:var(--acc);border-radius:10px;padding:10px 16px;font-weight:700}
+  .btn.sec{background:#262934}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+  #vGame{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+  #vGame .inner{width:100%;max-width:820px}
+  #vGame .sq{height:clamp(60px,12vh,100px);font-size:clamp(18px,4.5vw,34px)}
+  #vGame .grid{gap:12px} #vGame .r4{gap:12px}
+  #vGame .who{font-size:14px}
+  #role{text-align:center;font-size:clamp(24px,5vw,40px);font-weight:800;min-height:52px;margin-bottom:14px}
+  #role.me{color:var(--ok)} #role.other{color:var(--dim)} #role.warn{color:var(--y)}
+  #info{display:flex;justify-content:space-between;color:var(--dim);margin-top:16px}
+  .prog{height:6px;background:#262934;border-radius:3px;overflow:hidden;margin-top:8px}
+  .prog div{height:100%;width:0;background:var(--acc)}
+  #menuList{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  #menuList button{background:#1f222b;border-radius:10px;padding:10px;text-align:left}
+  #menuList button.sel{outline:2px solid var(--y)}
+  footer{color:var(--dim);font-size:12px;margin-top:24px}
+  footer a{color:var(--dim)}
+</style>
+</head>
+<body>
+<main id="vSetup">
+  <header><h1>Clash <span>en rythme</span></h1><small id="status" style="color:var(--dim)"></small></header>
+  <div id="endMsg" class="card hidden" style="text-align:center;font-size:22px;font-weight:800;margin-bottom:8px">Fin de la prod ! 🔥</div>
+
+  <div class="step">1 · Choisis tes mots</div>
+  <div class="card">
+    <div class="gridwrap">
+      <button class="arrow" id="schPrev">‹</button>
+      <div class="grid" id="previewGrid"></div>
+      <button class="arrow" id="schNext">›</button>
+    </div>
+    <div style="text-align:center;color:var(--dim);font-size:13px;margin-top:6px">Rimes : <b id="schName" style="color:var(--txt)"></b></div>
+    <div class="gridwrap" style="margin-top:10px">
+      <button class="arrow" id="packPrev">‹</button>
+      <button class="pill" id="packBtn"><b id="packName"></b><small id="packInfo"></small></button>
+      <button class="arrow" id="packNext">›</button>
+    </div>
+    <div id="menuList" class="hidden"></div>
+    <div class="opts">
+      <button class="opt" id="fillBtn"><small>Remplissage</small><b id="fillName"></b></button>
+      <button class="opt" id="perBtn"><small>À deux : chacun rappe</small><b id="perName"></b></button>
+    </div>
+  </div>
+
+  <div class="step">2 · Choisis ta prod <span id="beatCount"></span></div>
+  <div class="card">
+    <div class="chips" id="chips"></div>
+    <div class="beat">
+      <div class="cover" id="cover">🎧</div>
+      <div class="info"><b id="beatName">Chargement…</b><div id="beatInfo"></div></div>
+    </div>
+    <div class="seek"><div id="seekIn"></div></div>
+    <div class="ctrls">
+      <button class="round" id="beatPrev" title="Prod précédente">⏮</button>
+      <button class="round big" id="beatPlay" title="Écouter">▶</button>
+      <button class="round" id="beatNext" title="Prod suivante">⏭</button>
+      <button class="round" id="beatRand" title="Prod au hasard">🎲</button>
+    </div>
+    <div class="tune">
+      <button id="tickBtn" title="Un petit tic sur chaque temps, pour vérifier le calage">🔔 Tic sur les temps</button>
+      <span>Calage :</span>
+      <button id="halfBtn" title="Tempo divisé par 2">÷2</button>
+      <button id="dblBtn" title="Tempo multiplié par 2">×2</button>
+      <button id="shiftBtn" title="Décale le 1er temps d'un temps">Décaler d'1 temps</button>
+      <button id="resetTune" title="Revenir au calage automatique">↺</button>
+    </div>
+    <label>Volume</label><input id="vol" type="range" min="0" max="100" value="80">
+  </div>
+
+  <div id="duoPanel" class="hidden">
+    <div class="step">3 · Jouer à distance avec ton pote</div>
+    <div class="card">
+      <div id="duoConnect">
+        <label>Ton pseudo</label><input id="name" maxlength="16" placeholder="ex : Fabiano">
+        <div class="row" style="margin-top:12px">
+          <button class="btn" id="btnHost">Créer une partie</button>
+          <input id="joinCode" maxlength="5" placeholder="CODE" style="text-transform:uppercase;width:110px">
+          <button class="btn sec" id="btnJoin">Rejoindre</button>
+        </div>
+        <div id="hostWait" class="hidden" style="margin-top:14px">Donne ce code à ton pote : <div class="code" id="myCode"></div></div>
+      </div>
+      <div id="duoOn" class="hidden">
+        <div id="players" style="font-size:18px;font-weight:700"></div>
+        <div class="row">
+          <div><label>Qui commence</label><select id="first"><option value="r">Au hasard</option><option value="0">Moi</option><option value="1">Mon pote</option></select></div>
+          <div><small style="color:var(--dim)">ping : <span id="ping">–</span></small></div>
+        </div>
+      </div>
+      <p><small style="color:var(--dim)">La prod passe sur chaque PC en même temps (pas par Discord). Gardez Discord pour la voix, et mettez un <b>casque</b> tous les deux. Celui qui a créé la partie choisit les mots et la prod, puis appuie sur Jouer.</small></p>
+    </div>
+  </div>
+
+  <footer>Prods libres de droits venant de <a href="https://pixabay.com/music/" target="_blank" rel="noopener">Pixabay</a> (licence Pixabay) : <span id="credits"></span>.</footer>
+</main>
+
+<div class="playbar" id="playbar"><div>
+  <button class="duo" id="duoBtn">👥 À deux</button>
+  <button class="play" id="btnPlay" disabled>▶ Jouer</button>
+</div></div>
+
+<section id="vGame" class="hidden">
+  <div class="inner">
+    <div id="role"></div>
+    <div class="grid" id="gameGrid"></div>
+    <div class="prog"><div id="progIn"></div></div>
+    <div id="info"><span id="turnTxt"></span><span id="barTxt"></span></div>
+    <div style="text-align:center;margin-top:24px"><button class="btn sec" id="btnStop">■ Arrêter</button></div>
+  </div>
+</section>
+
+<script>
+const $ = id => document.getElementById(id);
+const PREFIX = 'clash-rythme-v2-';
+const FIRST_BAR = 2;     // on rappe à partir de la 3e mesure (2 mesures pour se caler)
+
+/* ================= LISTES DE MOTS ================= */
+const fam = a => a.map(s => s.split(' '));
+const PACKS = [
+ {name:'🔥 Classique', words: fam([
+ "été liberté vérité danger passé fatigué pressé café quartier métier",
+ "maison raison saison prison poison million mission passion",
+ "chance danse silence vacances confiance distance France avance",
+ "problème système même thème extrême poème crème baptême",
+ "sourire avenir empire délire souvenir plaisir désir partir",
+ "cœur peur bonheur douleur couleur honneur rappeur chaleur moteur",
+ "noir espoir histoire miroir trottoir victoire mémoire gloire soir",
+ "crime rime abîme victime intime sublime estime frime",
+ "musique magique panique brique Afrique classique physique boutique",
+ "page rage visage nuage voyage orage message image plage",
+ "yeux mieux vieux sérieux feu jeu bleu peu deux nerveux",
+ "argent temps sang enfant maman vent gens présent talent instant",
+ "demain chemin destin main matin pain refrain gamin terrain",
+ "fou loup cou genou tout bout coup goût nous",
+ "ça là papa soldat cinéma combat chat mafia",
+ "vie nuit ami pluie Paris ennui fini bruit survie envie",
+ "belle ciel miel réel rebelle nouvelle échelle éternel appel",
+ "tête fête planète tempête défaite conquête baskets cassette",
+ "roi foi loi froid voix choix moi toi endroit droit",
+ "mort fort sort corps effort trésor record accord dehors alors",
+ "rien bien chien lien quotidien gardien ancien musicien",
+ "frère mère guerre terre colère misère lumière prière hier",
+ "soleil sommeil pareil réveil merveille abeille conseil bouteille",
+ "classe place glace trace menace espace masse impasse"])},
+ {name:'🏙️ Rue', words: fam([
+ "quartier escalier policier billet pied papier",
+ "bitume rhume plume enclume brume costume",
+ "galère colère misère hier frère fer",
+ "embrouille magouille trouille fouille débrouille rouille",
+ "racaille bataille taille médaille travail canaille",
+ "béton baston ballon blouson pognon patron",
+ "sirène chaîne haine peine semaine arène",
+ "retard regard bizarre hasard dollar bagarre cauchemar star",
+ "route doute écoute déroute goutte croûte",
+ "bloc choc rock stock toc",
+ "voiture blessure armure aventure signature coupure allure"])},
+ {name:'🍔 Bouffe', words: fam([
+ "tomate patate pirate cravate frégate",
+ "salade grenade marmelade limonade camarade balade",
+ "frites mythes vite pépites limite marmite",
+ "burger danger boulanger manger étranger verger",
+ "gâteau couteau chapeau château bateau ghetto",
+ "fromage plage message voyage orage étage",
+ "poulet sorbet ballet filet palais mollet",
+ "chocolat avocat soda pizza nougat",
+ "soupe troupe coupe loupe groupe",
+ "nouilles grenouilles fouilles andouilles citrouilles",
+ "riz pari souris chili brebis tapis"])},
+ {name:'💀 Hardcore', words: fam([
+ "cynisme prisme séisme réalisme égoïsme racisme tourisme charisme",
+ "labyrinthe empreinte plainte crainte étreinte contrainte feinte",
+ "catastrophe philosophe strophe apostrophe",
+ "hélicoptère mystère cimetière frontière carrière poussière",
+ "acrobate cravate pirate tomate diplomate automate",
+ "hippopotame programme drame flamme lame âme",
+ "parachute chute minute dispute lutte flûte",
+ "éléphant volcan ouragan océan titan cadran",
+ "squelette silhouette trompette fourchette roquette vedette",
+ "pyramide timide liquide perfide vide rapide",
+ "dinosaure aurore trésor météore carnivore",
+ "kangourou bambou caillou hibou voyou tabou",
+ "mélancolie folie poésie jalousie hypocrisie amnésie",
+ "cyclone téléphone couronne amazone hormone"])}
+];
+PACKS.push({name:'🎲 Tout mélangé', words: PACKS.flatMap(p => p.words)});
+
+const SCHEMES = ['AABB','ABAB','ABBA','AAAA'];
+const FILLS = [{n:'Tous les mots', f:[1,1,1,1]}, {n:'Un sur deux', f:[0,1,0,1]}, {n:'Fin de bloc', f:[0,0,0,1]}];
+const PERS = [1, 2, 4, 8];
+let sch = 0, pack = 0, fill = 0, per = 1;
+
+function shuffle(a){ return a.slice().sort(() => Math.random() - 0.5); }
+function makeWords(nLines, scheme, fillIdx, packIdx){
+  const W = PACKS[packIdx].words, f = FILLS[fillIdx].f;
+  let pool = [];
+  const nextFam = () => { if (!pool.length) pool = shuffle(W.map((_, i) => i)); return shuffle(W[pool.pop()]); };
+  const out = [];
+  for (let q = 0; q < nLines; q += 4){
+    const fams = {A: nextFam(), B: nextFam()}, used = {A: 0, B: 0};
+    [...SCHEMES[scheme]].forEach((tag, k) => { const list = fams[tag]; out.push({tag, w: f[k] ? list[used[tag]++ % list.length] : null}); });
+  }
+  return out.slice(0, nLines);
+}
+
+/* ================= GRILLE ================= */
+function buildGrid(el){
+  el.innerHTML = [0,1,2,3].map(() => '<div class="r4"><div class="sq"><span class="who"></span></div><div class="sq"></div><div class="sq"></div><div class="sq w"></div></div>').join('');
+}
+// lines : 4 lignes {tag,w,who?,mine?} ; curRow : ligne en cours (-1 = aucune) ; beat : temps en cours
+function fillGrid(el, lines, curRow, beat){
+  [...el.children].forEach((row, r) => {
+    const it = lines[r];
+    if (!it){ row.className = 'r4 none'; return; }
+    const c = row.children, wcell = c[3];
+    wcell.className = 'sq w ' + it.tag + (it.w ? '' : ' free');
+    wcell.textContent = it.w || '?';
+    c[0].querySelector('.who').textContent = it.who || '';
+    row.className = 'r4' + (curRow >= 0 && r < curRow ? ' past' : '') + (it.mine ? ' mine' : '');
+    for (let k = 0; k < 4; k++) c[k].classList.toggle('on', r === curRow && k === beat);
+  });
+}
+function refreshSetup(){
+  $('schName').textContent = SCHEMES[sch];
+  $('packName').textContent = PACKS[pack].name;
+  $('packInfo').textContent = (pack + 1) + ' sur ' + PACKS.length + ' · ' + PACKS[pack].words.length + ' familles de rimes · clique pour voir tout';
+  $('fillName').textContent = FILLS[fill].n;
+  $('perName').textContent = PERS[per] + (PERS[per] > 1 ? ' mesures' : ' mesure') + ' chacun';
+  fillGrid($('previewGrid'), makeWords(4, sch, fill, pack), -1, -1);
+}
+buildGrid($('previewGrid')); buildGrid($('gameGrid'));
+const cyc = (v, d, n) => (v + d + n) % n;
+$('schPrev').onclick = () => { sch = cyc(sch, -1, SCHEMES.length); refreshSetup(); };
+$('schNext').onclick = () => { sch = cyc(sch, 1, SCHEMES.length); refreshSetup(); };
+$('packPrev').onclick = () => { pack = cyc(pack, -1, PACKS.length); refreshSetup(); };
+$('packNext').onclick = () => { pack = cyc(pack, 1, PACKS.length); refreshSetup(); };
+$('fillBtn').onclick = () => { fill = cyc(fill, 1, FILLS.length); refreshSetup(); };
+$('perBtn').onclick = () => { per = cyc(per, 1, PERS.length); refreshSetup(); };
+$('packBtn').onclick = () => {
+  const m = $('menuList'); m.classList.toggle('hidden');
+  m.innerHTML = PACKS.map((p, i) => `<button data-i="${i}" class="${i === pack ? 'sel' : ''}">${p.name}<br><small style="color:var(--dim)">${p.words.length} familles</small></button>`).join('');
+  [...m.children].forEach(b => b.onclick = () => { pack = +b.dataset.i; m.classList.add('hidden'); refreshSetup(); });
+};
+
+/* ================= AUDIO ================= */
+let ctx = null, master = null;
+function ensureCtx(){
+  if (!ctx){
+    ctx = new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
+    master = ctx.createGain(); master.gain.value = $('vol').value / 100; master.connect(ctx.destination);
+  }
+  if (ctx.state !== 'running') ctx.resume();
+}
+$('vol').oninput = e => { if (master) master.gain.value = e.target.value / 100; };
+const buffers = {}, loading = {};
+function loadBeat(id){
+  if (buffers[id]) return Promise.resolve(buffers[id]);
+  if (!loading[id]){ ensureCtx(); loading[id] = fetch('prods/' + id + '.mp3').then(r => r.arrayBuffer()).then(a => ctx.decodeAudioData(a)).then(b => (buffers[id] = b)); }
+  return loading[id];
+}
+function tick(t, strong){
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.frequency.value = strong ? 1760 : 1320;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+  o.connect(g).connect(master); o.start(t); o.stop(t + 0.06);
+}
+
+/* ================= PRODS ================= */
+let BEATS = [], filter = 'Tout', cur = 0, ticks = false;
+const ICON = {'Boom bap':'📼', 'Old school':'📻', 'Chill':'🌙', 'Drill':'🔪', 'Trap':'💎'};
+const tuneKey = id => 'clashTune-' + id;
+function tuneOf(b){ try { return JSON.parse(localStorage[tuneKey(b.id)] || 'null') || {bpm: b.bpm, offset: b.offset}; } catch(e){ return {bpm: b.bpm, offset: b.offset}; } }
+function setTune(b, t){ try { localStorage[tuneKey(b.id)] = JSON.stringify(t); } catch(e){} }
+const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+function visible(){ return BEATS.filter(b => filter === 'Tout' || b.style === filter); }
+function curBeat(){ return BEATS[cur]; }
+function refreshBeat(){
+  const b = curBeat(); if (!b) return;
+  const t = tuneOf(b);
+  $('beatName').textContent = b.title;
+  $('beatInfo').textContent = b.artist + ' · ' + b.style + ' · ' + Math.round(t.bpm) + ' BPM · ' + fmt(b.duration);
+  $('cover').textContent = ICON[b.style] || '🎧';
+  $('chips').innerHTML = ['Tout', ...new Set(BEATS.map(b => b.style))].map(s => `<button class="chip ${s === filter ? 'sel' : ''}">${s}</button>`).join('');
+  [...$('chips').children].forEach(c => c.onclick = () => { filter = c.textContent; const v = visible(); if (!v.includes(curBeat())) selectBeat(BEATS.indexOf(v[0])); else refreshBeat(); });
+  $('btnPlay').disabled = !!(duoActive() && !isHost);
+}
+function selectBeat(i){
+  const wasPreview = game && game.preview;
+  cur = i; refreshBeat();
+  if (duoActive() && isHost) conn.send({t:'select', id: curBeat().id});
+  loadBeat(curBeat().id);
+  if (wasPreview) startPreview(); else stopGame(false);
+}
+function step(d){ const v = visible(), k = v.indexOf(curBeat()); selectBeat(BEATS.indexOf(v[(k + d + v.length) % v.length])); }
+$('beatNext').onclick = () => step(1);
+$('beatPrev').onclick = () => step(-1);
+$('beatRand').onclick = () => { const v = visible(); selectBeat(BEATS.indexOf(v[Math.floor(Math.random() * v.length)])); };
+$('beatPlay').onclick = () => { if (game && game.preview) stopGame(false); else startPreview(); };
+$('tickBtn').onclick = () => { ticks = !ticks; $('tickBtn').classList.toggle('on', ticks); };
+function retune(f){ const b = curBeat(), t = tuneOf(b); f(t); setTune(b, t); refreshBeat(); if (game && game.preview) startPreview(); }
+$('halfBtn').onclick = () => retune(t => t.bpm /= 2);
+$('dblBtn').onclick = () => retune(t => t.bpm *= 2);
+$('shiftBtn').onclick = () => retune(t => { const beat = 60 / t.bpm; t.offset = (t.offset + beat) % (beat * 4); });
+$('resetTune').onclick = () => { const b = curBeat(); try { localStorage.removeItem(tuneKey(b.id)); } catch(e){} refreshBeat(); if (game && game.preview) startPreview(); };
+
+function startPreview(){
+  ensureCtx();
+  const b = curBeat(), t = tuneOf(b);
+  $('beatPlay').textContent = '…';
+  startGame({preview: true, id: b.id, bpm: t.bpm, offset: t.offset, startAt: hostNow() + 100, words: [], per: 1e6, first: ME, duo: false});
+}
+
+/* ================= DÉROULÉ ================= */
+let game = null, raf = null, tickTimer = null, myToken = 0;
+let isHost = false, ME = 0, names = ['', ''], conn = null, peer = null;
+let offset = 0, clockSamples = [], pingTimer = null;
+const hostNow = () => performance.now() + offset;
+const duoActive = () => !!(conn && conn.open);
+
+async function startGame(m){
+  ensureCtx(); stopGame(false);
+  const token = ++myToken;
+  const buf = await loadBeat(m.id);
+  if (token !== myToken) return;      // une autre partie a été lancée entre-temps
+  const outLat = ctx.outputLatency || ctx.baseLatency || 0;
+  const songOut = ctx.currentTime + (m.startAt - hostNow()) / 1000;   // moment où le début de la prod sort des enceintes
+  const bus = ctx.createGain(); bus.connect(master);
+  const src = ctx.createBufferSource(); src.buffer = buf; src.connect(bus);
+  const when = songOut - outLat;
+  if (when >= ctx.currentTime) src.start(when); else src.start(ctx.currentTime, ctx.currentTime - when);
+  const barDur = 240 / m.bpm;
+  const nBars = Math.floor((buf.duration - m.offset) / barDur);
+  game = {...m, src, bus, songOut, barDur, beatDur: barDur / 4, dur: buf.duration, nLines: Math.max(0, nBars - FIRST_BAR), nextTick: 0};
+  src.onended = () => { if (game && game.src === src){ const pv = game.preview; stopGame(false); if (!pv) $('endMsg').classList.remove('hidden'); } };
+  tickTimer = setInterval(scheduleTicks, 25); scheduleTicks();
+  if (!m.preview){
+    $('endMsg').classList.add('hidden');
+    $('vGame').classList.remove('hidden'); $('playbar').classList.add('hidden');
+  } else $('beatPlay').textContent = '⏸';
+  raf = requestAnimationFrame(draw);
+}
+function scheduleTicks(){
+  const g = game; if (!g || !ticks) return;
+  const outLat = ctx.outputLatency || ctx.baseLatency || 0;
+  while (true){
+    const t = g.songOut + g.offset + g.nextTick * g.beatDur;
+    if (t > ctx.currentTime + 0.3 + outLat || t > g.songOut + g.dur) break;
+    if (t - outLat >= ctx.currentTime) tick(t - outLat, g.nextTick % 4 === 0);
+    g.nextTick++;
+  }
+}
+function stopGame(send){
+  myToken++;
+  if (send && duoActive()) conn.send({t:'stop'});
+  clearInterval(tickTimer); cancelAnimationFrame(raf);
+  if (game){ const {src, bus} = game; game = null; bus.gain.setTargetAtTime(0, ctx.currentTime, 0.04); setTimeout(() => { try { src.stop(); } catch(e){} bus.disconnect(); }, 300); }
+  $('vGame').classList.add('hidden'); $('playbar').classList.remove('hidden');
+  $('beatPlay').textContent = '▶'; $('seekIn').style.width = '0';
+}
+function lineInfo(L){
+  const g = game, r = (g.first + Math.floor(L / g.per)) % 2;
+  return {r, mine: !g.duo || r === ME};
+}
+function draw(){
+  const g = game; if (!g) return;
+  raf = requestAnimationFrame(draw);
+  const t = ctx.currentTime - g.songOut;          // temps écoulé dans la prod
+  $('seekIn').style.width = Math.max(0, Math.min(100, t / g.dur * 100)) + '%';
+  if (g.preview) return;
+  const tm = t - g.offset, role = $('role'), other = names[1 - ME] || 'Ton pote', grid = $('gameGrid');
+  const bar = Math.floor(tm / g.barDur), beat = Math.floor((tm - bar * g.barDur) / g.beatDur);
+  const L = bar - FIRST_BAR;
+  const lineObj = k => { if (k < 0 || k >= g.nLines) return null; const w = g.words[k], i = lineInfo(k); return {...w, mine: g.duo && i.mine, who: g.duo ? (i.mine ? 'TOI' : other.slice(0, 6).toUpperCase()) : ''}; };
+  const block = Math.max(0, Math.floor(L / 4) * 4);
+  fillGrid(grid, [0,1,2,3].map(r => lineObj(block + r)), L >= 0 ? L - block : -1, beat);
+  $('progIn').style.width = Math.max(0, Math.min(100, t / g.dur * 100)) + '%';
+  if (L >= g.nLines){ role.className = 'warn'; role.textContent = 'Fin ! 🔥'; $('barTxt').textContent = ''; return; }
+  $('barTxt').textContent = L >= 0 ? 'Mesure ' + (L + 1) + ' / ' + g.nLines : '';
+  $('turnTxt').textContent = Math.round(g.bpm) + ' BPM';
+  if (L < 0){
+    const left = -L * 4 - beat - (tm < 0 ? 0 : 0);
+    const first = lineInfo(0);
+    role.className = first.mine ? 'me' : 'other';
+    if (tm < 0) role.textContent = 'Prêt ?';
+    else role.textContent = (first.mine ? 'À toi dans… ' : other + ' commence dans… ') + left;
+    return;
+  }
+  const now = lineInfo(L), next = lineInfo(L + 1);
+  const lastOfTurn = (L + 1) % g.per === 0 && L + 1 < g.nLines && g.duo && now.r !== next.r;
+  if (lastOfTurn && !now.mine){ role.className = 'warn'; role.textContent = 'À toi dans… ' + (4 - beat); }
+  else if (now.mine){ role.className = 'me'; role.textContent = g.duo ? 'À TOI !' : ''; }
+  else { role.className = 'other'; role.textContent = other + ' rappe'; }
+}
+
+$('btnPlay').onclick = async () => {
+  ensureCtx();
+  const duo = duoActive();
+  if (duo && !isHost) return;
+  const b = curBeat(), t = tuneOf(b);
+  $('btnPlay').disabled = true; $('btnPlay').textContent = 'Chargement…';
+  const buf = await loadBeat(b.id);
+  $('btnPlay').disabled = false; $('btnPlay').textContent = duo ? '▶ Jouer à deux' : '▶ Jouer';
+  const nLines = Math.max(0, Math.floor((buf.duration - t.offset) / (240 / t.bpm)) - FIRST_BAR);
+  const m = {t:'start', duo, id: b.id, bpm: t.bpm, offset: t.offset, per: duo ? PERS[per] : 1e6,
+             first: duo ? ($('first').value === 'r' ? (Math.random() < .5 ? 0 : 1) : +$('first').value) : ME,
+             words: makeWords(nLines, sch, fill, pack), startAt: hostNow() + (duo ? 2500 : 400)};
+  if (duo) conn.send(m);
+  startGame(m);
+};
+$('btnStop').onclick = () => stopGame(true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && game && !game.preview) stopGame(true); });
+
+/* ================= À DEUX (PeerJS relie les 2 PC) ================= */
+$('duoBtn').onclick = () => { $('duoPanel').classList.toggle('hidden'); $('duoBtn').classList.toggle('on', !$('duoPanel').classList.contains('hidden')); $('duoPanel').scrollIntoView({behavior:'smooth'}); };
+try { $('name').value = localStorage.clashName || ''; } catch(e){}
+function status(t){ $('status').textContent = t; }
+function myName(){ return ($('name').value.trim() || (isHost ? 'Joueur 1' : 'Joueur 2')).slice(0, 16); }
+function duoView(){
+  $('duoConnect').classList.add('hidden'); $('duoOn').classList.remove('hidden');
+  $('players').textContent = '🎤 ' + (names[0] || 'Joueur 1') + '  vs  🎤 ' + (names[1] || 'Joueur 2');
+  $('first').disabled = !isHost;
+  $('btnPlay').textContent = isHost ? '▶ Jouer à deux' : 'C\'est ' + (names[0] || 'ton pote') + ' qui lance';
+  $('btnPlay').disabled = !isHost;
+}
+function setupConn(c){
+  conn = c;
+  c.on('open', () => {
+    status('connecté ✔'); names[ME] = myName(); c.send({t:'hello', name: names[ME]});
+    if (!isHost){ clockSamples = []; sendPing(); pingTimer = setInterval(sendPing, 400); }
+    else c.send({t:'select', id: curBeat().id});
+    duoView();
+  });
+  c.on('data', onData);
+  c.on('close', () => { status('pote déconnecté'); stopGame(false); clearInterval(pingTimer); conn = null; $('btnPlay').textContent = '▶ Jouer'; $('btnPlay').disabled = false; $('duoOn').classList.add('hidden'); $('duoConnect').classList.remove('hidden'); $('btnHost').disabled = $('btnJoin').disabled = false; });
+}
+function sendPing(){ if (duoActive()) conn.send({t:'ping', c: performance.now()}); }
+function onData(m){
+  if (m.t === 'hello'){ names[1 - ME] = m.name; duoView(); }
+  else if (m.t === 'ping') conn.send({t:'pong', c: m.c, h: performance.now()});
+  else if (m.t === 'pong'){
+    const t1 = performance.now(), rtt = t1 - m.c;
+    clockSamples.push({rtt, off: m.h - (m.c + t1) / 2}); if (clockSamples.length > 25) clockSamples.shift();
+    offset = clockSamples.reduce((a, b) => b.rtt < a.rtt ? b : a).off;
+    $('ping').textContent = Math.round(rtt) + ' ms';
+    if (clockSamples.length === 15){ clearInterval(pingTimer); pingTimer = setInterval(sendPing, 2000); }
+    conn.send({t:'rtt', v: Math.round(rtt)});
+  }
+  else if (m.t === 'rtt') $('ping').textContent = m.v + ' ms';
+  else if (m.t === 'select'){ const i = BEATS.findIndex(b => b.id === m.id); if (i >= 0){ cur = i; filter = 'Tout'; refreshBeat(); loadBeat(m.id); } }
+  else if (m.t === 'start'){ const i = BEATS.findIndex(b => b.id === m.id); if (i >= 0){ cur = i; refreshBeat(); } startGame(m); }
+  else if (m.t === 'stop') stopGame(false);
+}
+function randCode(){ const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 5; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
+$('btnHost').onclick = () => {
+  ensureCtx(); try { localStorage.clashName = $('name').value.trim(); } catch(e){}
+  isHost = true; ME = 0; offset = 0; $('btnHost').disabled = $('btnJoin').disabled = true;
+  const code = randCode(); status('connexion…');
+  peer = new Peer(PREFIX + code);
+  peer.on('open', () => { status('en attente du pote'); $('myCode').textContent = code; $('hostWait').classList.remove('hidden'); });
+  peer.on('connection', c => { if (conn){ c.close(); return; } setupConn(c); });
+  peer.on('error', e => { status('erreur : ' + e.type); $('btnHost').disabled = $('btnJoin').disabled = false; });
+};
+$('btnJoin').onclick = () => {
+  const code = $('joinCode').value.trim().toUpperCase(); if (code.length < 5) return status('code incomplet');
+  ensureCtx(); try { localStorage.clashName = $('name').value.trim(); } catch(e){}
+  isHost = false; ME = 1; $('btnHost').disabled = $('btnJoin').disabled = true; status('connexion…');
+  peer = new Peer();
+  peer.on('open', () => setupConn(peer.connect(PREFIX + code, {reliable: true})));
+  peer.on('error', e => { status(e.type === 'peer-unavailable' ? 'code introuvable' : 'erreur : ' + e.type); $('btnHost').disabled = $('btnJoin').disabled = false; });
+};
+
+/* ================= DÉMARRAGE ================= */
+refreshSetup();
+fetch('prods.json').then(r => r.json()).then(list => {
+  BEATS = list; cur = Math.floor(Math.random() * BEATS.length);
+  $('beatCount').textContent = '(' + BEATS.length + ' prods)';
+  $('credits').textContent = [...new Set(BEATS.map(b => b.artist))].join(', ');
+  $('btnPlay').disabled = false; refreshBeat();
+});
+</script>
+</body>
+</html>
