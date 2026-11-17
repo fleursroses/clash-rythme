@@ -64,7 +64,9 @@
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
   #vGame{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
   #vGame .inner{width:100%;max-width:820px}
-  #vGame .sq{height:clamp(60px,12vh,100px);font-size:clamp(18px,4.5vw,34px)}
+  #viewport{overflow:hidden;position:relative;-webkit-mask-image:linear-gradient(#000 80%,transparent);mask-image:linear-gradient(#000 80%,transparent)}
+  #gameGrid{will-change:transform}
+  #vGame .sq{height:clamp(54px,10.5vh,92px);font-size:clamp(18px,4.5vw,34px)}
   #vGame .grid{gap:12px} #vGame .r4{gap:12px}
   #vGame .who{font-size:14px}
   #role{text-align:center;font-size:clamp(24px,5vw,40px);font-weight:800;min-height:52px;margin-bottom:14px}
@@ -164,7 +166,7 @@
 <section id="vGame" class="hidden">
   <div class="inner">
     <div id="role"></div>
-    <div style="position:relative"><div class="grid" id="gameGrid"></div><div id="ball"></div></div>
+    <div style="position:relative"><div id="viewport"><div class="grid" id="gameGrid"></div></div><div id="ball"></div></div>
     <div class="prog"><div id="progIn"></div></div>
     <div id="info"><span id="turnTxt"></span><span id="barTxt"></span></div>
     <div style="text-align:center;margin-top:24px"><button class="btn" id="btnPause">⏸ Pause</button> <button class="btn sec" id="btnStop">■ Arrêter</button></div>
@@ -367,7 +369,7 @@ function refreshSetup(){
   $('perName').textContent = PERS[per] + (PERS[per] > 1 ? ' mesures' : ' mesure') + ' chacun';
   fillGrid($('previewGrid'), makeWords(4, sch, fill, pack), -1, -1);
 }
-buildGrid($('previewGrid')); buildGrid($('gameGrid'));
+buildGrid($('previewGrid'));
 const cyc = (v, d, n) => (v + d + n) % n;
 $('schPrev').onclick = () => { sch = cyc(sch, -1, SCHEMES.length); refreshSetup(); };
 $('schNext').onclick = () => { sch = cyc(sch, 1, SCHEMES.length); refreshSetup(); };
@@ -470,6 +472,7 @@ async function startGame(m){
   if (!m.preview){
     $('endMsg').classList.add('hidden'); $('btnPause').textContent = '⏸ Pause';
     $('vGame').classList.remove('hidden'); $('playbar').classList.add('hidden');
+    buildGameList();
   } else $('beatPlay').textContent = '⏸';
   raf = requestAnimationFrame(draw);
 }
@@ -535,6 +538,16 @@ function placeBall(rowIdx, beatF, countIn){
   ball.style.display = 'block';
   ball.style.transform = `translate(${x - 13}px, ${y - 24}px)`;
 }
+function buildGameList(){
+  const g = game, grid = $('gameGrid'), other = names[1 - ME] || 'Ton pote';
+  grid.innerHTML = g.words.slice(0, g.nLines).map((w, k) => {
+    const i = lineInfo(k), who = g.duo ? (i.mine ? 'TOI' : other.slice(0, 6).toUpperCase()) : '';
+    return `<div class="r4${g.duo && i.mine ? ' mine' : ''}"><div class="sq"><span class="who">${who}</span></div><div class="sq"></div><div class="sq"></div><div class="sq w ${w.tag}${w.w ? '' : ' free'}">${w.w || '?'}</div></div>`;
+  }).join('');
+  const r = grid.children;
+  g.pitch = r.length > 1 ? r[1].offsetTop - r[0].offsetTop : 80;
+  $('viewport').style.height = (g.pitch * 4.5) + 'px';
+}
 function lineInfo(L){
   const g = game, r = (g.first + Math.floor(L / g.per)) % 2;
   return {r, mine: !g.duo || r === ME};
@@ -548,11 +561,17 @@ function draw(){
   const tm = t - g.offset, role = $('role'), other = names[1 - ME] || 'Ton pote', grid = $('gameGrid');
   const bar = Math.floor(tm / g.barDur), beat = Math.floor((tm - bar * g.barDur) / g.beatDur);
   const L = bar - FIRST_BAR;
-  const lineObj = k => { if (k < 0 || k >= g.nLines) return null; const w = g.words[k], i = lineInfo(k); return {...w, mine: g.duo && i.mine, who: g.duo ? (i.mine ? 'TOI' : other.slice(0, 6).toUpperCase()) : ''}; };
-  const block = Math.max(0, Math.floor(L / 4) * 4);
-  fillGrid(grid, [0,1,2,3].map(r => lineObj(block + r)), L >= 0 ? L - block : -1, beat);
   const beatF = (tm - bar * g.barDur) / g.beatDur;
-  if (tm < 0 || L >= g.nLines) placeBall(-1); else if (L < 0) placeBall(0, beatF, true); else placeBall(L - block, beatF, false);
+  // défilement : la ligne en cours reste en 2e position, les suivantes montent pendant le dernier temps
+  const fr = Math.max(0, Math.min(1, beatF - 3));
+  const pos = Math.max(-1, Math.min(g.nLines, L + (1 - Math.cos(Math.PI * fr)) / 2));
+  grid.style.transform = `translateY(${-(pos - 1) * g.pitch}px)`;
+  const rows = grid.children;
+  for (let k = Math.max(0, L - 2); k <= Math.min(g.nLines - 1, L + 1); k++){
+    const row = rows[k]; row.classList.toggle('past', k < L);
+    for (let c = 0; c < 4; c++) row.children[c].classList.toggle('on', k === L && c === beat);
+  }
+  if (tm < 0 || L >= g.nLines) placeBall(-1); else if (L < 0) placeBall(0, beatF, true); else placeBall(L, beatF, false);
   if (g.paused){ role.className = 'warn'; role.textContent = '⏸ Pause'; return; }
   $('progIn').style.width = Math.max(0, Math.min(100, t / g.dur * 100)) + '%';
   if (L >= g.nLines){ role.className = 'warn'; role.textContent = 'Fin ! 🔥'; $('barTxt').textContent = ''; return; }
