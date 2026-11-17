@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Clash en rythme</title>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 <style>
   :root{--bg:#0b0c10;--card:#15171d;--line:#262934;--txt:#eceef3;--dim:#8d93a1;--acc:#ff3d6e;--A:#ff9a2e;--B:#38c6ff;--y:#ffd23d;--ok:#3dffb0}
   *{box-sizing:border-box}
@@ -172,7 +172,7 @@
 
 <script>
 const $ = id => document.getElementById(id);
-const PREFIX = 'clash-rythme-v2-';
+const PREFIX = 'clash-rythme/v3/';
 const FIRST_BAR = 2;     // on rappe à partir de la 3e mesure (2 mesures pour se caler)
 
 /* ================= LISTES DE MOTS ================= */
@@ -372,10 +372,10 @@ function startPreview(){
 
 /* ================= DÉROULÉ ================= */
 let game = null, raf = null, tickTimer = null, myToken = 0;
-let isHost = false, ME = 0, names = ['', ''], conn = null, peer = null;
+let isHost = false, ME = 0, names = ['', ''], conn = null;
 let offset = 0, clockSamples = [], pingTimer = null;
 const hostNow = () => performance.now() + offset;
-const duoActive = () => !!(conn && conn.open);
+const duoActive = () => !!(paired && conn);
 
 async function startGame(m){
   ensureCtx(); stopGame(false);
@@ -470,7 +470,7 @@ $('btnPlay').onclick = async () => {
 $('btnStop').onclick = () => stopGame(true);
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && game && !game.preview) stopGame(true); });
 
-/* ================= À DEUX (PeerJS relie les 2 PC) ================= */
+/* ================= À DEUX (relais MQTT) ================= */
 $('duoBtn').onclick = () => { $('duoPanel').classList.toggle('hidden'); $('duoBtn').classList.toggle('on', !$('duoPanel').classList.contains('hidden')); $('duoPanel').scrollIntoView({behavior:'smooth'}); };
 try { $('name').value = localStorage.clashName || ''; } catch(e){}
 function status(t){ $('status').textContent = t; }
@@ -482,51 +482,86 @@ function duoView(){
   $('btnPlay').textContent = isHost ? '▶ Jouer à deux' : 'C\'est ' + (names[0] || 'ton pote') + ' qui lance';
   $('btnPlay').disabled = !isHost;
 }
-function setupConn(c){
-  conn = c;
-  c.on('open', () => {
-    status('connecté ✔'); names[ME] = myName(); c.send({t:'hello', name: names[ME]});
-    if (!isHost){ clockSamples = []; sendPing(); pingTimer = setInterval(sendPing, 400); }
-    else c.send({t:'select', id: curBeat().id});
-    duoView();
+// Les messages passent par un relais MQTT public (marche derrière toutes les box, contrairement au P2P)
+const BROKER = 'wss://broker.hivemq.com:8884/mqtt';
+let client = null, room = '', paired = false, lastSeen = 0, joinTimer = null, watchTimer = null, peerId = null;
+const myId = Math.random().toString(36).slice(2, 10);
+function makeConn(){ return {open: true, send(m){ if (client) client.publish(room + (isHost ? '/g' : '/h'), JSON.stringify({...m, from: myId})); }}; }
+function connectRelay(onReady){
+  let ready = false;
+  client = mqtt.connect(BROKER, {connectTimeout: 8000, reconnectPeriod: 2000, clean: true});
+  client.on('connect', () => client.subscribe(room + (isHost ? '/h' : '/g'), {qos: 0}, () => { status(paired ? 'connecté ✔' : status_wait()); if (!ready){ ready = true; onReady(); } }));
+  client.on('message', (topic, payload) => {
+    let m; try { m = JSON.parse(payload.toString()); } catch(e){ return; }
+    if (peerId && m.from !== peerId && m.t !== 'join') return;   // un 3e joueur : ignoré
+    if (peerId && m.t === 'join' && m.from !== peerId) return;
+    lastSeen = performance.now(); onData(m);
   });
-  c.on('data', onData);
-  c.on('close', () => { status('pote déconnecté'); stopGame(false); clearInterval(pingTimer); conn = null; $('btnPlay').textContent = '▶ Jouer'; $('btnPlay').disabled = false; $('duoOn').classList.add('hidden'); $('duoConnect').classList.remove('hidden'); $('btnHost').disabled = $('btnJoin').disabled = false; });
+  client.on('offline', () => status('connexion perdue, je réessaie…'));
+  client.on('error', e => status('erreur réseau : ' + e.message));
+}
+function status_wait(){ return isHost ? 'en attente du pote' : 'je cherche la partie…'; }
+function disconnect(msg){
+  paired = false; peerId = null; conn = null;
+  clearInterval(pingTimer); clearInterval(watchTimer); clearTimeout(joinTimer);
+  if (client){ try { client.end(true); } catch(e){} client = null; }
+  stopGame(false); status(msg);
+  $('btnPlay').textContent = '▶ Jouer'; $('btnPlay').disabled = false;
+  $('duoOn').classList.add('hidden'); $('duoConnect').classList.remove('hidden'); $('hostWait').classList.add('hidden');
+  $('btnHost').disabled = $('btnJoin').disabled = false;
+}
+function onPaired(){
+  paired = true; clearTimeout(joinTimer); lastSeen = performance.now();
+  status('connecté ✔'); duoView();
+  watchTimer = setInterval(() => { if (paired && performance.now() - lastSeen > 15000) disconnect('pote déconnecté'); }, 2000);
 }
 function sendPing(){ if (duoActive()) conn.send({t:'ping', c: performance.now()}); }
 function onData(m){
-  if (m.t === 'hello'){ names[1 - ME] = m.name; duoView(); }
+  if (m.t === 'join' && isHost){
+    if (paired) return;
+    peerId = m.from; names[1] = m.name; names[0] = myName();
+    conn.send({t:'hello', name: names[0]}); conn.send({t:'select', id: curBeat().id});
+    onPaired();
+  }
+  else if (m.t === 'hello' && !isHost){
+    if (paired) return;
+    peerId = m.from; names[0] = m.name; names[1] = myName();
+    onPaired();
+    clockSamples = []; sendPing(); pingTimer = setInterval(sendPing, 300);
+  }
   else if (m.t === 'ping') conn.send({t:'pong', c: m.c, h: performance.now()});
   else if (m.t === 'pong'){
     const t1 = performance.now(), rtt = t1 - m.c;
-    clockSamples.push({rtt, off: m.h - (m.c + t1) / 2}); if (clockSamples.length > 25) clockSamples.shift();
+    clockSamples.push({rtt, off: m.h - (m.c + t1) / 2}); if (clockSamples.length > 40) clockSamples.shift();
     offset = clockSamples.reduce((a, b) => b.rtt < a.rtt ? b : a).off;
     $('ping').textContent = Math.round(rtt) + ' ms';
-    if (clockSamples.length === 15){ clearInterval(pingTimer); pingTimer = setInterval(sendPing, 2000); }
+    if (clockSamples.length === 30){ clearInterval(pingTimer); pingTimer = setInterval(sendPing, 1500); }
     conn.send({t:'rtt', v: Math.round(rtt)});
   }
   else if (m.t === 'rtt') $('ping').textContent = m.v + ' ms';
   else if (m.t === 'select'){ const i = BEATS.findIndex(b => b.id === m.id); if (i >= 0){ cur = i; filter = 'Tout'; refreshBeat(); loadBeat(m.id); } }
   else if (m.t === 'start'){ const i = BEATS.findIndex(b => b.id === m.id); if (i >= 0){ cur = i; refreshBeat(); } startGame(m); }
   else if (m.t === 'stop') stopGame(false);
+  else if (m.t === 'bye') disconnect('ton pote a quitté');
 }
+window.addEventListener('pagehide', () => { if (paired && conn) conn.send({t:'bye'}); });
 function randCode(){ const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 5; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
 $('btnHost').onclick = () => {
   ensureCtx(); try { localStorage.clashName = $('name').value.trim(); } catch(e){}
   isHost = true; ME = 0; offset = 0; $('btnHost').disabled = $('btnJoin').disabled = true;
-  const code = randCode(); status('connexion…');
-  peer = new Peer(PREFIX + code);
-  peer.on('open', () => { status('en attente du pote'); $('myCode').textContent = code; $('hostWait').classList.remove('hidden'); });
-  peer.on('connection', c => { if (conn){ c.close(); return; } setupConn(c); });
-  peer.on('error', e => { status('erreur : ' + e.type); $('btnHost').disabled = $('btnJoin').disabled = false; });
+  const code = randCode(); room = PREFIX + code; conn = makeConn(); status('connexion…');
+  connectRelay(() => { $('myCode').textContent = code; $('hostWait').classList.remove('hidden'); });
 };
 $('btnJoin').onclick = () => {
   const code = $('joinCode').value.trim().toUpperCase(); if (code.length < 5) return status('code incomplet');
   ensureCtx(); try { localStorage.clashName = $('name').value.trim(); } catch(e){}
-  isHost = false; ME = 1; $('btnHost').disabled = $('btnJoin').disabled = true; status('connexion…');
-  peer = new Peer();
-  peer.on('open', () => setupConn(peer.connect(PREFIX + code, {reliable: true})));
-  peer.on('error', e => { status(e.type === 'peer-unavailable' ? 'code introuvable' : 'erreur : ' + e.type); $('btnHost').disabled = $('btnJoin').disabled = false; });
+  isHost = false; ME = 1; $('btnHost').disabled = $('btnJoin').disabled = true;
+  room = PREFIX + code; conn = makeConn(); status('connexion…');
+  connectRelay(() => {
+    const ask = () => { if (!paired) conn.send({t:'join', name: myName()}); };
+    ask(); const again = setInterval(() => paired ? clearInterval(again) : ask(), 1500);
+    joinTimer = setTimeout(() => { clearInterval(again); if (!paired) disconnect('pas de réponse : vérifie le code, et que ton pote est sur « Créer une partie »'); }, 12000);
+  });
 };
 
 /* ================= DÉMARRAGE ================= */
